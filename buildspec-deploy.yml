@@ -1,34 +1,43 @@
 version: 0.2
-env:
-  variables:
-    AWS_DEFAULT_REGION: eu-central-1
-    CLUSTER_NAME: eksDeepDiveFrankfurt
-    NAMESPACE: ns-davi-lab3
-    APP_NAME: todo-davi-lab3
+
 phases:
   install:
     commands:
-      - curl -sLo kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.34.1/2025-09-19/bin/linux/amd64/kubectl
-      - chmod +x kubectl && mv kubectl /usr/local/bin/
-      - yum -y install jq
+      - echo ">> Instalando dependências (jq + kubectl)"
+      # instala jq no Ubuntu/Debian (standard:7.0). Se for AL2/AL2023, cai no yum/dnf.
+      - |
+        if command -v apt-get >/dev/null 2>&1; then
+          apt-get update && apt-get install -y jq
+        elif command -v yum >/dev/null 2>&1; then
+          yum -y install jq
+        elif command -v dnf >/dev/null 2>&1; then
+          dnf -y install jq
+        else
+          echo "Nenhum gerenciador de pacotes suportado encontrado"; exit 1
+        fi
+      - curl -sLo /usr/local/bin/kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.34.1/2025-09-19/bin/linux/amd64/kubectl
+      - chmod +x /usr/local/bin/kubectl
+      - aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $CLUSTER_NAME
+
   pre_build:
     commands:
-      - aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $CLUSTER_NAME
-      - echo "Lendo imagem gerada no estágio build"
-      - IMAGE=$(jq -r '.image' image.json)
-      - TAG=$(jq -r '.tag' image.json)
-      - FULL_IMAGE="$IMAGE:$TAG"
+      - echo ">> Contexto kubectl"
+      - kubectl version --client=true
+      - kubectl get ns || true
+      - kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
   build:
     commands:
-      - echo "Aplicando namespace e recursos base"
+      - echo ">> Aplicando manifests"
       - kubectl apply -f k8s/namespace.yaml
-      - kubectl get deploy $APP_NAME-deploy -n $NAMESPACE || kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
+      - kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
       - kubectl apply -f k8s/service.yaml -n $NAMESPACE
-      - echo "Atualizando imagem do deployment"
-      - kubectl set image deployment/$APP_NAME-deploy $APP_NAME=$FULL_IMAGE -n $NAMESPACE --record
+      - echo ">> Recursos"
+      - kubectl get deploy,svc,pods -n $NAMESPACE
+
   post_build:
     commands:
-      - kubectl rollout status deployment/$APP_NAME-deploy -n $NAMESPACE --timeout=180s
+      - echo "Deploy finalizado"
 artifacts:
   files:
     - image.json
