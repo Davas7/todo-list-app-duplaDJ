@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-davi-lab3-lb
+  namespace: ns-davi-lab3
+spec:
+  selector: { app: todo-davi-lab3 }
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: LoadBalancer

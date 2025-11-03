@@ -1,0 +1,26 @@
+version: 0.2
+env:
+  variables:
+    AWS_DEFAULT_REGION: eu-central-1
+    APP_NAME: todo-davi-lab3
+phases:
+  pre_build:
+    commands:
+      - echo "Definindo ECR_URI e TAG"
+      - if [ -z "$ECR_URI" ]; then export ECR_URI="$ECR_URI_OVERRIDE"; fi
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_URI
+      - SHORT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
+      - IMAGE_TAG=${SHORT_SHA:-build-$CODEBUILD_BUILD_NUMBER}
+  build:
+    commands:
+      - echo "Build da imagem"
+      - docker build -t $ECR_URI:$IMAGE_TAG -t $ECR_URI:latest .
+  post_build:
+    commands:
+      - echo "Push da imagem"
+      - docker push $ECR_URI:$IMAGE_TAG
+      - docker push $ECR_URI:latest
+      - printf '{"image":"%s","tag":"%s"}' "$ECR_URI" "$IMAGE_TAG" > image.json
+artifacts:
+  files:
+    - image.json

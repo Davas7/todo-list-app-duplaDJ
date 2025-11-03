@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-davi-lab3-deploy
+  namespace: ns-davi-lab3
+  labels: { app: todo-davi-lab3 }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: todo-davi-lab3 }
+  template:
+    metadata:
+      labels: { app: todo-davi-lab3 }
+    spec:
+      containers:
+        - name: todo-davi-lab3
+          # imagem inicial só como placeholder; o pipeline vai trocar via "kubectl set image"
+          image: public.ecr.aws/docker/library/nginx:alpine
+          ports:
+            - containerPort: 3000
